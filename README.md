@@ -2,7 +2,7 @@
 
 Proyecto integrador de **Programación Aplicada III**.
 
-**Integrantes:** [Integrante 1], [Integrante 2], [Integrante 3]
+**Integrantes:** [Michael Montoya], [Jairo Nieto], [Juan Henao], [yaritza gutierrez]
 
 **URL pública (Render):** [pegar aquí el enlace de Render]
 
