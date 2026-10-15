@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seguimiento de proyectos</title>
+<style>
+  body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; color: #1c2321; background: #f4f6f4; line-height: 1.5; }
+  h1 { margin-bottom: 4px; }
+  h2 { margin-top: 32px; border-bottom: 2px solid #2e7d46; padding-bottom: 4px; }
+  .sub { color: #5a6661; margin-top: 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  form, .proyecto { background: #fff; border: 1px solid #d5dbd6; border-radius: 8px; padding: 14px; }
+  form h3 { margin: 0 0 10px; font-size: 1rem; }
+  label { display: block; font-size: .85rem; color: #5a6661; margin-top: 8px; }
+  input, select, button { font: inherit; width: 100%; padding: 8px; margin-top: 3px; border: 1px solid #b9c2bb; border-radius: 6px; background: #fff; color: inherit; }
+  button { background: #2e7d46; color: #fff; border-color: #2e7d46; cursor: pointer; margin-top: 12px; }
+  button:hover { background: #256a3a; }
+  button.peligro { background: #fff; color: #a32d2d; border-color: #a32d2d; width: auto; margin: 0; padding: 4px 10px; font-size: .85rem; }
+  #mensaje { min-height: 1.5em; margin: 16px 0; padding: 8px 12px; border-radius: 6px; }
+  #mensaje.ok { background: #e1f1e6; color: #1d5a31; }
+  #mensaje.error { background: #fbe4e4; color: #8a2020; }
+  .proyecto { margin-bottom: 14px; }
+  .proyecto header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .proyecto h3 { margin: 0; }
+  .meta { color: #5a6661; font-size: .9rem; }
+  .promedio { font-weight: 600; margin: 8px 0 4px; }
+  ul.entregas { margin: 4px 0 0; padding-left: 20px; }
+  ul.entregas li { margin: 3px 0; }
+  .sin-nota { color: #a0650f; }
+  .vacio { color: #5a6661; font-style: italic; }
+</style>
+</head>
+<body>
+  <h1>Seguimiento de proyectos de curso</h1>
+  <p class="sub">Registra proyectos, sus entregas y calificaciones, y consulta el promedio de cada proyecto.</p>
+
+  <div id="mensaje" role="status"></div>
+
+  <div class="grid">
+    <form id="formProyecto">
+      <h3>Nuevo proyecto</h3>
+      <label for="nombre">Nombre</label>
+      <input type="text" id="nombre" required>
+      <label for="equipo">Equipo</label>
+      <input type="text" id="equipo" required>
+      <label for="fechaLimite">Fecha límite</label>
+      <input type="date" id="fechaLimite" required>
+      <button type="submit">Crear proyecto</button>
+    </form>
+
+    <form id="formEntrega">
+      <h3>Registrar entrega</h3>
+      <label for="entregaProyecto">Proyecto</label>
+      <select id="entregaProyecto" required></select>
+      <label for="descripcion">Descripción</label>
+      <input type="text" id="descripcion" required>
+      <button type="submit">Registrar entrega</button>
+    </form>
+
+    <form id="formCalificar">
+      <h3>Calificar entrega</h3>
+      <label for="calificarEntrega">Entrega</label>
+      <select id="calificarEntrega" required></select>
+      <label for="calificacion">Calificación (0 a 5)</label>
+      <input type="number" id="calificacion" min="0" max="5" step="0.1" required>
+      <button type="submit">Guardar calificación</button>
+    </form>
+  </div>
+
+  <h2>Proyectos</h2>
+  <div id="listaProyectos"></div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    // Crea un elemento y le agrega texto (textContent evita inyectar HTML).
+    function el(etiqueta, texto, clase) {
+      const nodo = document.createElement(etiqueta);
+      if (texto !== undefined) nodo.textContent = texto;
+      if (clase) nodo.className = clase;
+      return nodo;
+    }
+
+    function mostrarMensaje(texto, esError) {
+      const caja = $('mensaje');
+      caja.textContent = texto;
+      caja.className = esError ? 'error' : 'ok';
+    }
+
+    function formatearFecha(valor) {
+      // Las fechas AAAA-MM-DD se leen como locales para que no se corran un día.
+      const fecha = new Date(valor.length === 10 ? valor + 'T00:00:00' : valor);
+      return fecha.toLocaleDateString('es');
+    }
+
+    // Llama a la API; devuelve { ok, data } y nunca lanza por un error HTTP.
+    async function api(url, metodo, cuerpo) {
+      const opciones = { method: metodo || 'GET' };
+      if (cuerpo !== undefined) {
+        opciones.headers = { 'Content-Type': 'application/json' };
+        opciones.body = JSON.stringify(cuerpo);
+      }
+      const res = await fetch(url, opciones);
+      // Algunas respuestas (como DELETE -> 204) no traen cuerpo.
+      const texto = await res.text();
+      const data = texto ? JSON.parse(texto) : {};
+      return { ok: res.ok, data };
+    }
+
+    async function cargar() {
+      const { data: proyectos } = await api('/proyectos');
+
+      // Para cada proyecto se piden sus entregas y su promedio.
+      const detalle = await Promise.all(proyectos.map(async (p) => {
+        const [entregas, promedio] = await Promise.all([
+          api('/proyectos/' + p.id + '/entregas'),
+          api('/proyectos/' + p.id + '/promedio')
+        ]);
+        return { proyecto: p, entregas: entregas.data, promedio: promedio.data };
+      }));
+
+      dibujarLista(detalle);
+      llenarSelects(detalle);
+    }
+
+    function dibujarLista(detalle) {
+      const lista = $('listaProyectos');
+      lista.replaceChildren();
+
+      if (detalle.length === 0) {
+        lista.appendChild(el('p', 'Todavía no hay proyectos. Crea el primero con el formulario de arriba.', 'vacio'));
+        return;
+      }
+
+      detalle.forEach(({ proyecto, entregas, promedio }) => {
+        const tarjeta = el('div', undefined, 'proyecto');
+
+        const cabecera = el('header');
+        const titulo = el('div');
+        titulo.appendChild(el('h3', proyecto.nombre));
+        titulo.appendChild(el('div', 'Equipo: ' + proyecto.equipo + ' · Fecha límite: ' + formatearFecha(proyecto.fechaLimite) + ' · ID ' + proyecto.id, 'meta'));
+        cabecera.appendChild(titulo);
+
+        const borrar = el('button', 'Eliminar', 'peligro');
+        borrar.type = 'button';
+        borrar.addEventListener('click', () => eliminarProyecto(proyecto));
+        cabecera.appendChild(borrar);
+        tarjeta.appendChild(cabecera);
+
+        tarjeta.appendChild(el('div',
+          promedio.promedio === null
+            ? 'Promedio: aún no hay entregas calificadas'
+            : 'Promedio: ' + promedio.promedio + ' (' + promedio.entregasCalificadas +
+              (promedio.entregasCalificadas === 1 ? ' entrega calificada)' : ' entregas calificadas)'),
+          'promedio'));
+
+        if (entregas.length === 0) {
+          tarjeta.appendChild(el('div', 'Sin entregas registradas.', 'vacio'));
+        } else {
+          const ul = el('ul', undefined, 'entregas');
+          entregas.forEach((e) => {
+            const li = el('li');
+            li.appendChild(document.createTextNode('#' + e.id + ' ' + e.descripcion + ' (' + formatearFecha(e.fechaEntrega) + ') — '));
+            li.appendChild(e.calificacion === null
+              ? el('span', 'sin calificar', 'sin-nota')
+              : el('strong', 'nota ' + e.calificacion));
+            ul.appendChild(li);
+          });
+          tarjeta.appendChild(ul);
+        }
+        lista.appendChild(tarjeta);
+      });
+    }
+
+    function llenarSelects(detalle) {
+      const selProyecto = $('entregaProyecto');
+      const selEntrega = $('calificarEntrega');
+      const proyectoPrevio = selProyecto.value;
+      const entregaPrevia = selEntrega.value;
+      selProyecto.replaceChildren();
+      selEntrega.replaceChildren();
+
+      detalle.forEach(({ proyecto, entregas }) => {
+        const opcion = el('option', proyecto.nombre + ' (ID ' + proyecto.id + ')');
+        opcion.value = proyecto.id;
+        selProyecto.appendChild(opcion);
+
+        entregas.forEach((e) => {
+          const op = el('option', proyecto.nombre + ' — #' + e.id + ' ' + e.descripcion);
+          op.value = e.id;
+          selEntrega.appendChild(op);
+        });
+      });
+
+      if (proyectoPrevio) selProyecto.value = proyectoPrevio;
+      if (entregaPrevia) selEntrega.value = entregaPrevia;
+    }
+
+    // Después de cada acción se muestra el resultado y se vuelve a pedir todo a la API.
+    async function ejecutar(promesa, textoExito) {
+      try {
+        const { ok, data } = await promesa;
+        mostrarMensaje(ok ? textoExito : 'Error: ' + data.error, !ok);
+        await cargar();
+        return ok;
+      } catch (err) {
+        mostrarMensaje('No se pudo comunicar con el servidor', true);
+        return false;
+      }
+    }
+
+    async function eliminarProyecto(proyecto) {
+      if (!confirm('¿Eliminar "' + proyecto.nombre + '" y todas sus entregas?')) return;
+      await ejecutar(api('/proyectos/' + proyecto.id, 'DELETE'), 'Proyecto eliminado');
+    }
+
+    $('formProyecto').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const ok = await ejecutar(api('/proyectos', 'POST', {
+        nombre: $('nombre').value,
+        equipo: $('equipo').value,
+        fechaLimite: $('fechaLimite').value
+      }), 'Proyecto creado');
+      if (ok) e.target.reset();
+    });
+
+    $('formEntrega').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const ok = await ejecutar(api('/entregas', 'POST', {
+        proyectoId: $('entregaProyecto').value,
+        descripcion: $('descripcion').value
+      }), 'Entrega registrada');
+      if (ok) $('descripcion').value = '';
+    });
+
+    $('formCalificar').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const ok = await ejecutar(api('/entregas/' + $('calificarEntrega').value + '/calificar', 'PUT', {
+        calificacion: $('calificacion').value
+      }), 'Calificación guardada');
+      if (ok) $('calificacion').value = '';
+    });
+
+    cargar().catch(() => mostrarMensaje('No se pudo comunicar con el servidor', true));
+  </script>
+</body>
+</html>
