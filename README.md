@@ -74,3 +74,5 @@ Los casos de prueba completos están en [`pruebas.md`](pruebas.md).
 
 ## Nota sobre persistencia
 Los datos se guardan en `src/data/db.json`. En Render (plan gratuito) este archivo puede reiniciarse tras un periodo de inactividad; es una limitación conocida de este nivel del proyecto.
+## Despliegue en Producción
+https://seguimiento-proyecto.onrender.com
