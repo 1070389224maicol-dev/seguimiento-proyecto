@@ -2,7 +2,7 @@
 
 Proyecto integrador de **Programación Aplicada III**.
 
-**Integrantes:** [Michael Montoya], [Jairo Nieto], [Juan Henao], [yaritza gutierrez]
+**Integrantes:** [Michael Montoya], [Jairo Nieto], [Diego Henao], [yaritza gutierrez]
 
 **URL pública (Render):** [https://seguimiento-proyecto.onrender.com]
 
