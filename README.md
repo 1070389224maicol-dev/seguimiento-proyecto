@@ -4,7 +4,7 @@ Proyecto integrador de **Programación Aplicada III**.
 
 **Integrantes:** [Michael Montoya], [Jairo Nieto], [Juan Henao], [yaritza gutierrez]
 
-**URL pública (Render):** [pegar aquí el enlace de Render]
+**URL pública (Render):** [https://seguimiento-proyecto.onrender.com]
 
 ## Estado actual
 - [x] Semana 1: análisis, planeación y diseño (`requisitos.md`, `planeacion.md`, `diseño.md`)
