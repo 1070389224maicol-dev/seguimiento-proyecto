@@ -1,6 +1,6 @@
 # Requisitos — Caso 3: Seguimiento de proyectos de curso
 
-**Equipo:** [Integrante 1], [Integrante 2], [Integrante 3]
+**Equipo:** [michael david montoya], [jairo nieto], [diego henao], [Yaritza gutierrez]
 **Asignatura:** Programación Aplicada III
 
 ## 1. Descripción general
